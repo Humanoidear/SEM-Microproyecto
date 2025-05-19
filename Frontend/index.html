@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TND Controller</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body class="top-0 left-0 w-screen h-screen bg-gray-800 overflow-hidden flex flex-col gap-3">
+    <div id="connectionStatus"
+        class="top-4 right-6 flex items-center gap-2 text-xs px-4 py-1 rounded-full bg-gray-400/10 absolute z-10">
+        <i class="fas fa-circle text-red-400 animate-pulse" id="connectionDot"></i>
+        <span id="connectionText" class="text-white font-semibold tracking-wide">Connecting...</span>
+    </div>
+    <!-- Camera stream placeholder -->
+    <div class="flex-1 h-screen rounded-b-3xl md:rounded-b-none md:fixed relative inset-0 z-0 overflow-hidden">
+        <div class="w-full h-full bg-gray-800 flex items-center justify-center">
+            <!--<iframe src="http://10.42.145.210" class="w-full h-full absolute z-10" frameborder="0"></iframe> -->
+            <span class="text-white text-2xl opacity-40">[ Camera Stream is unavailable due to high volumes of traffic, please look at the screen above... ]</span>
+        </div>
+    </div>
+    <!-- Controls bottom right -->
+    <div class="w-full md:w-auto relative md:fixed md:bottom-8 md:right-8 z-10">
+        <div
+            class="backdrop-blur-lg bg-gradient-to-br from-white/80 to-blue-100/80 shadow-2xl rounded-t-3xl md:rounded-3xl w-full md:w-96 flex flex-col items-center relative border border-blue-200/40 overflow-hidden">
+            <!-- Connection status -->
+            <span class="p-6 w-full h-full flex flex-row items-center justify-between gap-4 relative">
+                <!-- Enhanced Position Indicator -->
+                <div class="relative flex flex-col items-center">
+                    <span class="-top-3 text-[10px] text-blue-400 font-semibold uppercase tracking-wide absolute">Position</span>
+                    <span id="position" 
+                        class="mt-2 relative z-10 text-xl font-bold text-white bg-gradient-to-br from-blue-500 to-blue-600 px-4 py-1.5 rounded-xl shadow-lg border border-blue-400/80 flex items-center justify-center min-w-[3rem]">
+                        -
+                    </span>
+                    <div class="absolute -inset-1 bg-blue-500/20 blur-md rounded-xl"></div>
+                </div>
+                
+                <!-- Enhanced Progress and Timer Display with dynamic border and label -->
+                <div class="flex-grow relative">
+                    <div id="queueLabel" class="-top-3 right-0 text-[10px] text-blue-400 font-semibold uppercase tracking-wide transition-colors duration-300 absolute">Queue Status</div>
+                    
+                    <!-- Progress bar container with dynamic border styling -->
+                    <div id="progressContainer" class="mt-2 h-full text-lg font-bold bg-gradient-to-r from-white/90 to-blue-50/90 rounded-xl shadow-md border border-blue-200/60 overflow-hidden relative p-1.5 transition-all duration-300">
+                        <!-- Status icon that changes based on state -->
+                        <div class="absolute left-3 top-1/2 -translate-y-1/2 z-20 flex items-center transition-all duration-300">
+                            <i id="statusIcon" class="fas fa-clock text-blue-600/80 mr-2 text-sm"></i>
+                        </div>
+                        
+                        <!-- Progress track with dynamic coloring -->
+                        <div class="left-0 top-0 w-full h-full bg-gradient-to-r from-blue-50 to-blue-100/50 overflow-hidden z-0 absolute">
+                            <div id="queueProgress" 
+                                class="h-full transition-all duration-500 bg-gradient-to-r from-blue-400 to-blue-500"
+                                style="width: 0%">
+                                <!-- Animated pulse effect for active state -->
+                                <div id="activeIndicator" class="hidden absolute inset-0 bg-gradient-to-r from-green-400/30 to-green-500/30 animate-pulse"></div>
+                                <!-- Waiting pulse effect -->
+                                <div id="waitingIndicator" class="hidden absolute inset-0 bg-gradient-to-r from-yellow-400/30 to-yellow-500/30 animate-pulse"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Timer text with enhanced positioning and padding for icon space -->
+                        <span id="timer" class="relative z-10 pl-8 text-blue-700 font-semibold transition-colors duration-300">
+                            ...
+                        </span>
+                    </div>
+                </div>
+            </span>
+
+            <!-- Replace the D-Pad with a virtual joystick -->
+            <div id="controlsContainer" class="mt-4 opacity-60 pointer-events-none transition-all duration-300 w-full flex flex-col items-center">
+                <!-- Virtual Joystick Container -->
+                <div id="joystickContainer" class="relative w-48 h-48 mb-4">
+                    <!-- Joystick Base -->
+                    <div class="absolute inset-0 rounded-full bg-gradient-to-br from-gray-100/70 to-blue-100/70 border-2 border-blue-200/60 shadow-inner flex items-center justify-center overflow-hidden">
+                        <!-- Base highlight effects -->
+                        <div class="absolute w-full h-full rounded-full bg-gradient-to-t from-transparent to-white/20 pointer-events-none"></div>
+                        <div class="absolute top-0 left-0 w-full h-1/2 rounded-t-full bg-white/10 pointer-events-none"></div>
+                        
+                        <!-- Direction indicators -->
+                        <span class="absolute top-4 text-xs font-semibold text-blue-600/60">M1 ON</span>
+                        <span class="absolute bottom-4 text-xs font-semibold text-orange-600/60">M1 REV</span>
+                        <span class="absolute left-4 text-xs font-semibold text-blue-600/60">M2 ON</span>
+                        <span class="absolute right-4 text-xs font-semibold text-orange-600/60">M2 REV</span>
+                        
+                        <!-- Center marker -->
+                        <div class="w-6 h-6 rounded-full bg-blue-50 border border-blue-200/50 flex items-center justify-center">
+                            <div class="w-2 h-2 rounded-full bg-blue-400"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Draggable Joystick Handle -->
+                    <div id="joystickHandle" class="absolute cursor-grab active:cursor-grabbing w-16 h-16 rounded-full bg-gradient-to-br from-white to-blue-100 border-2 border-blue-300 shadow-lg flex items-center justify-center transform transition-transform duration-75" style="top: calc(50% - 2rem); left: calc(50% - 2rem);">
+                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-500 shadow-inner flex items-center justify-center">
+                            <div class="w-6 h-6 rounded-full bg-gradient-to-br from-blue-300 to-blue-400 flex items-center justify-center">
+                                <i class="fas fa-arrows-up-down-left-right text-white text-xs"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Motor status -->
+                <div class="p-6 flex justify-between w-full mt-2 gap-4">
+                    <span id="motor1Status"
+                        class="text-xs px-4 py-2 rounded-full bg-gradient-to-r from-blue-100 to-blue-200 text-blue-700 font-semibold shadow border border-blue-200">M1:
+                        OFF</span>
+                    <span id="motor2Status"
+                        class="text-xs px-4 py-2 rounded-full bg-gradient-to-r from-blue-100 to-blue-200 text-blue-700 font-semibold shadow border border-blue-200">M2:
+                        OFF</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+        // Socket connection
+        const socket = io('http://localhost:3000');
+        const positionEl = document.getElementById('position');
+        const timerEl = document.getElementById('timer');
+        const controlsContainer = document.getElementById('controlsContainer');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const connectionDot = document.getElementById('connectionDot');
+        const connectionText = document.getElementById('connectionText');
+        const queueProgress = document.getElementById('queueProgress');
+        const queueLabel = document.getElementById('queueLabel');
+        const progressContainer = document.getElementById('progressContainer');
+        // Motor status indicators
+        const motor1Status = document.getElementById('motor1Status');
+        const motor2Status = document.getElementById('motor2Status');
+        const statusIcon = document.getElementById('statusIcon');
+        const activeIndicator = document.getElementById('activeIndicator');
+        const waitingIndicator = document.getElementById('waitingIndicator');
+        let myId = null, startAt = null, expiresAt = null, countdownInterval = null, turnDuration = 10000;
+        let motor1State = 'OFF', motor2State = 'OFF';
+        socket.on('connect', () => {
+            myId = socket.id;
+            connectionDot.classList.replace('text-red-400', 'text-green-400');
+            connectionText.textContent = 'Connected';
+        });
+        socket.on('disconnect', () => {
+            connectionDot.classList.replace('text-green-400', 'text-red-400');
+            connectionText.textContent = 'Disconnected';
+            disableControls();
+        });
+        socket.on('queueUpdate', (queue) => {
+            const me = queue.find(client => client.id === myId);
+            if (me) {
+                positionEl.textContent = me.spot;
+                startAt = me.startAt;
+                expiresAt = me.expiresAt;
+                clearInterval(countdownInterval);
+                countdownInterval = setInterval(updateStatus, 250);
+                updateStatus();
+                updateQueueProgress(me.spot, queue.length);
+            } else {
+                positionEl.textContent = "—";
+                timerEl.textContent = "Not in queue";
+                updateQueueProgress(0, 0);
+                disableControls();
+                clearInterval(countdownInterval);
+            }
+        });
+        // Enhanced updateStatus function with more dynamic UI changes
+        function updateStatus() {
+            const now = Date.now();
+            
+            // Reset all indicators first
+            activeIndicator.classList.add('hidden');
+            waitingIndicator.classList.add('hidden');
+            queueProgress.classList.remove('from-green-400', 'to-green-500', 'from-yellow-400', 'to-yellow-500', 'from-blue-400', 'to-blue-500');
+            
+            // Reset border and label colors
+            progressContainer.classList.remove('border-green-300/70', 'border-yellow-300/70', 'border-blue-200/60');
+            queueLabel.classList.remove('text-green-500', 'text-yellow-500', 'text-blue-400');
+            
+            if (startAt && now < startAt) {
+                // Waiting for turn
+                const waitTime = Math.max(0, Math.floor((startAt - now) / 1000));
+                timerEl.classList.remove('text-white', 'text-green-600');
+                timerEl.classList.add('text-yellow-600');
+                
+                // Update progress bar color to show waiting
+                queueProgress.classList.add('from-yellow-400', 'to-yellow-500');
+                waitingIndicator.classList.remove('hidden');
+                
+                // Update border and label colors for waiting state
+                progressContainer.classList.add('border-yellow-300/70');
+                queueLabel.classList.add('text-yellow-500');
+                queueLabel.textContent = "Waiting for Turn";
+                
+                // Update icon to waiting
+                statusIcon.className = 'fas fa-hourglass-half text-yellow-600/80 mr-2 text-sm';
+                
+                disableControls();
+            } else if (expiresAt && now < expiresAt) {
+                // Active turn
+                const timeLeft = Math.max(0, Math.floor((expiresAt - now) / 1000));
+                timerEl.textContent = `${timeLeft}s left`;
+                timerEl.classList.remove('text-blue-700');
+                timerEl.classList.add('text-green-600');
+                
+                // Update progress bar - green for active state
+                queueProgress.classList.add('from-green-400', 'to-green-500');
+                activeIndicator.classList.remove('hidden');
+                
+                // Update border and label colors for active state
+                progressContainer.classList.add('border-green-300/70');
+                queueLabel.classList.add('text-green-500');
+                queueLabel.textContent = "Your Turn";
+                
+                // Dynamic progress based on time left
+                const percentLeft = (timeLeft / (turnDuration/1000)) * 100;
+                queueProgress.style.width = `${percentLeft}%`;
+                
+                // Update icon to active
+                statusIcon.className = 'fas fa-gamepad text-green-600/80 mr-2 text-sm';
+                
+                enableControls();
+            } else if (expiresAt && now >= expiresAt) {
+                // Turn ended, waiting for next cycle
+                timerEl.textContent = "Waiting...";
+                timerEl.classList.remove('text-white', 'text-green-600');
+                timerEl.classList.add('text-blue-700');
+                
+                // Standard waiting color
+                queueProgress.classList.add('from-blue-400', 'to-blue-500');
+                
+                // Reset border and label to standard state
+                progressContainer.classList.add('border-blue-200/60');
+                queueLabel.classList.add('text-blue-400');
+                queueLabel.textContent = "Queue Status";
+                
+                // Update icon
+                statusIcon.className = 'fas fa-sync-alt text-blue-600/80 mr-2 text-sm animate-spin';
+                
+                disableControls();
+            }
+        }
+        function enableControls() {
+            controlsContainer.classList.remove('opacity-60', 'pointer-events-none');
+            controlsContainer.classList.add('opacity-100');
+        }
+        function disableControls() {
+            controlsContainer.classList.add('opacity-60', 'pointer-events-none');
+            controlsContainer.classList.remove('opacity-100');
+        }
+        function updateMotorStatus(motorNumber, state) {
+            const statusElement = motorNumber === 1 ? motor1Status : motor2Status;
+            statusElement.textContent = `M${motorNumber}: ${state}`;
+            
+            // Reset classes to maintain consistent styling
+            statusElement.className = "text-xs px-4 py-2 rounded-full shadow border font-semibold";
+            
+            // Apply appropriate styling based on state while keeping the gradient style
+            if (state === 'ON') {
+                statusElement.classList.add('bg-gradient-to-r', 'from-green-100', 'to-green-200', 'text-green-700', 'border-green-200');
+            } else if (state === 'REVERSE') {
+                statusElement.classList.add('bg-gradient-to-r', 'from-orange-100', 'to-orange-200', 'text-orange-700', 'border-orange-200');
+            } else {
+                statusElement.classList.add('bg-gradient-to-r', 'from-blue-100', 'to-blue-200', 'text-blue-700', 'border-blue-200');
+            }
+        }
+        function controlMotor(motorNumber, action) {
+            fetch(`http://localhost:3000/motor${motorNumber}/${action.toLowerCase()}`)
+                .then(r => r.json())
+                .then(data => { if (data.success) updateMotorStatus(motorNumber, action); })
+                .catch(console.error);
+        }
+        // Enhanced progress bar update logic
+        function updateQueueProgress(spot, total) {
+            if (spot && total && total > 1) {
+                // Position 1 is active user, show 100%
+                // Last position shows small amount
+                const percent = Math.max(5, Math.min(100, 100 * (total - spot + 1) / total));
+                
+                // If it's not our turn, update progress bar width based on queue position
+                const now = Date.now();
+                if (!(expiresAt && now < expiresAt)) {
+                    queueProgress.style.width = percent + "%";
+                }
+                
+                // Add queue position info to timer text if waiting
+                if (startAt && now < startAt) {
+                    const waitTime = Math.max(0, Math.floor((startAt - now) / 1000));
+                    timerEl.textContent = `Wait ${waitTime}s · ${spot} of ${total}`;
+                }
+            } else {
+                queueProgress.style.width = "0%";
+            }
+        }
+
+        // Get references to joystick elements
+        const joystickContainer = document.getElementById('joystickContainer');
+        const joystickHandle = document.getElementById('joystickHandle');
+        
+        // Joystick state
+        let isDragging = false;
+        let currentMotorStates = { motor1: null, motor2: null };
+        let centerX, centerY, maxDistance;
+        
+        // Initialize joystick
+        function initJoystick() {
+            const rect = joystickContainer.getBoundingClientRect();
+            centerX = rect.width / 2;
+            centerY = rect.height / 2;
+            maxDistance = rect.width / 2 - joystickHandle.offsetWidth / 2;
+
+            // Reset handle position
+            resetJoystickHandle();
+        }
+        
+        // Reset joystick to center
+        function resetJoystickHandle() {
+            joystickHandle.style.left = `calc(50% - ${joystickHandle.offsetWidth / 2}px)`;
+            joystickHandle.style.top = `calc(50% - ${joystickHandle.offsetHeight / 2}px)`;
+            
+            // Turn off motors when released
+            if (currentMotorStates.motor1) {
+                controlMotor(1, 'OFF');
+                currentMotorStates.motor1 = null;
+            }
+            if (currentMotorStates.motor2) {
+                controlMotor(2, 'OFF');
+                currentMotorStates.motor2 = null;
+            }
+        }
+        
+        // Handle joystick movement
+        function moveJoystick(clientX, clientY) {
+            if (!isDragging) return;
+            
+            const rect = joystickContainer.getBoundingClientRect();
+            let dx = clientX - rect.left - centerX;
+            let dy = clientY - rect.top - centerY;
+            
+            // Calculate distance from center
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            // Limit movement to maxDistance
+            if (distance > maxDistance) {
+                const angle = Math.atan2(dy, dx);
+                dx = Math.cos(angle) * maxDistance;
+                dy = Math.sin(angle) * maxDistance;
+            }
+            
+            // Move joystick handle
+            joystickHandle.style.left = `${centerX + dx - joystickHandle.offsetWidth / 2}px`;
+            joystickHandle.style.top = `${centerY + dy - joystickHandle.offsetHeight / 2}px`;
+            
+            // Determine motor actions based on joystick position
+            updateMotorActions(dx / maxDistance, dy / maxDistance);
+        }
+        
+        // Update motor actions based on joystick position
+        function updateMotorActions(xRatio, yRatio) {
+            const deadZone = 0.25; // 25% deadzone in the center
+            
+            // Handle M1 (vertical axis)
+            if (yRatio < -deadZone) {
+                // Up - M1 ON
+                if (currentMotorStates.motor1 !== 'ON') {
+                    controlMotor(1, 'ON');
+                    currentMotorStates.motor1 = 'ON';
+                    socket.emit('interact');
+                }
+            } else if (yRatio > deadZone) {
+                // Down - M1 REVERSE
+                if (currentMotorStates.motor1 !== 'REVERSE') {
+                    controlMotor(1, 'REVERSE');
+                    currentMotorStates.motor1 = 'REVERSE';
+                    socket.emit('interact');
+                }
+            } else if (currentMotorStates.motor1) {
+                // Center zone - Turn off
+                controlMotor(1, 'OFF');
+                currentMotorStates.motor1 = null;
+            }
+            
+            // Handle M2 (horizontal axis)
+            if (xRatio < -deadZone) {
+                // Left - M2 ON
+                if (currentMotorStates.motor2 !== 'ON') {
+                    controlMotor(2, 'ON');
+                    currentMotorStates.motor2 = 'ON';
+                    socket.emit('interact');
+                }
+            } else if (xRatio > deadZone) {
+                // Right - M2 REVERSE
+                if (currentMotorStates.motor2 !== 'REVERSE') {
+                    controlMotor(2, 'REVERSE');
+                    currentMotorStates.motor2 = 'REVERSE';
+                    socket.emit('interact');
+                }
+            } else if (currentMotorStates.motor2) {
+                // Center zone - Turn off
+                controlMotor(2, 'OFF');
+                currentMotorStates.motor2 = null;
+            }
+        }
+        
+        // Event listeners for mouse/touch events
+        joystickHandle.addEventListener('mousedown', (e) => {
+            if (!controlsContainer.classList.contains('pointer-events-none')) {
+                isDragging = true;
+                joystickHandle.classList.add('cursor-grabbing');
+                e.preventDefault();
+            }
+        });
+        
+        document.addEventListener('mousemove', (e) => {
+            moveJoystick(e.clientX, e.clientY);
+        });
+        
+        document.addEventListener('mouseup', () => {
+            if (isDragging) {
+                isDragging = false;
+                joystickHandle.classList.remove('cursor-grabbing');
+                resetJoystickHandle();
+            }
+        });
+        
+        // Touch events for mobile
+        joystickHandle.addEventListener('touchstart', (e) => {
+            if (!controlsContainer.classList.contains('pointer-events-none')) {
+                isDragging = true;
+                e.preventDefault();
+            }
+        });
+        
+        document.addEventListener('touchmove', (e) => {
+            if (isDragging && e.touches[0]) {
+                moveJoystick(e.touches[0].clientX, e.touches[0].clientY);
+                e.preventDefault();
+            }
+        });
+        
+        document.addEventListener('touchend', () => {
+            if (isDragging) {
+                isDragging = false;
+                resetJoystickHandle();
+            }
+        });
+        
+        // Initialize on page load
+        window.addEventListener('load', initJoystick);
+        window.addEventListener('resize', initJoystick);
+        
+        // Update the disableControls function to reset joystick
+        const originalDisableControls = disableControls;
+        disableControls = function() {
+            originalDisableControls();
+            resetJoystickHandle();
+            isDragging = false;
+        };
+    </script>
+</body>
+
+</html>
